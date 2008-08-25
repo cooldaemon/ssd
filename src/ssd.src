@@ -1,0 +1,104 @@
+#!/bin/sh
+
+ROOT=%ROOT_DIR%
+ERL='/usr/bin/env erl'
+YAWS='/usr/local/lib/yaws'
+
+echo_usage () {
+  echo "usage: $0 [start|stop|copy|chtype|show] [OPTIONS]"
+  echo "OPTIONS"
+  echo " $0 start -n [node name] -p [port number] -t [ram|disc]"
+  echo " $0 stop -n [node name]"
+  echo " $0 copy -s [source node name] -n [dest node name] -p [port number] -t [ram|disc]"
+  echo " $0 chtype -n [node name] -t [ram|disc]"
+  echo " $0 show -m [info|warning|error]"
+  exit 1
+}
+
+args=''
+port=''
+type=''
+name=''
+srouce=''
+message=''
+
+command=$1
+shift
+
+case $command in
+  start)
+    args='p:t:n:'
+    ;;
+  stop)
+    args='n:'
+    ;;
+  copy)
+    args='p:t:n:s:'
+    ;;
+  chtype)
+    args='t:n:'
+    ;;
+  show)
+    args='m:'
+    ;;
+  *)
+    echo_usage;;
+esac
+
+while getopts $args flag; do
+  case $flag in
+    p)
+      port="$OPTARG";;
+    t)
+      type="$OPTARG";;
+    n)
+      name="$OPTARG";;
+    s)
+      source="$OPTARG";;
+    m)
+      message="$OPTARG";;
+    \?)
+      echo_usage;;
+    esac
+done
+
+shift $(($OPTIND - 1))
+
+case $command in
+  start)
+    ${ERL} +A 1 +Ktrue -boot start_sasl -config ${ROOT}/config/elog +W w \
+           -name ${name} -pa ${ROOT}/ebin \
+           -pa ${YAWS}/ebin -yaws embedded true \
+           -s ssd_ctl start -detached \
+           -port ${port} -type ${type} \
+           -yaws_dir ${YAWS} -ssd_dir ${ROOT}
+    echo "Starting Simple Storage Daemon."
+    ;;
+  stop)
+    ${ERL} -noshell -name ssd_ctl -pa ${ROOT}/ebin \
+           -s ssd_ctl stop -s init stop \
+           -node ${name}
+    ;;
+  copy)
+    ${ERL} +A 1 +Ktrue -boot start_sasl -config ${ROOT}/config/elog +W w \
+           -name ${name} -pa ${ROOT}/ebin \
+           -pa ${YAWS}/ebin -yaws embedded true \
+           -s ssd_ctl copy -detached \
+           -port ${port} -type ${type} -node ${source} \
+           -yaws_dir ${YAWS} -ssd_dir ${ROOT}
+    echo "Starting replication node."
+    ;;
+  chtype)
+    ${ERL} -noshell -name ssd_ctl -pa ${ROOT}/ebin \
+           -s ssd_ctl change_copy_type -s init stop \
+           -type ${type} -node ${name}
+    ;;
+  show)
+    ${ERL} -boot start_sasl -config ${ROOT}/config/elog +W w \
+           -noshell -name ssd_ctl -pa ${ROOT}/ebin \
+           -s ssd_ctl show -s init stop \
+           -message ${message}
+esac
+                                                                       
+exit 0
+

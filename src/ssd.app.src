@@ -1,0 +1,10 @@
+{application, ssd, [
+  {description, "Simple Storage Daemon!!"},
+  {vsn, "%VSN%"},
+  {modules, [ssd_store_manager, ssd_store]},
+  {registered, [ssd_store_manager]},
+  {applications, [kernel, stdlib, sasl]},
+  {mod, {ssd_app, []}},
+  {start_phases, []}
+]}.
+
